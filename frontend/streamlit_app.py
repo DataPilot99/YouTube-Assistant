@@ -10,7 +10,7 @@ st.sidebar.write('**Instructions**\n\nPaste a YouTube video link, '
 if 'messages' not in st.session_state:
     st.session_state.messages=[]
 
-# YouTube URL pattern
+# Validate YouTube URL pattern
 youtube_pattern = re.compile(
     r"^(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=[\w-]{11}|embed/[\w-]{11}|shorts/[\w-]{11}|[\w-]{11})"
 )

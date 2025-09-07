@@ -86,9 +86,9 @@ def context(inputs: dict):
 # PromptTemplate provides a structure to the prompt thats sent to the llm
 RAG_prompt = PromptTemplate(
     template="""
-      You are a helpful assistant.
-      Answer ONLY from the provided transcript context.
-      If the context is insufficient, just say you don't know.
+      You are a strict assistant.
+      Answer ONLY by quoting or paraphrasing from the transcript below.
+      If the transcript does not explicitly answer, reply: "I don't know."
       {context}
       Question: {question}
     """,
