@@ -78,7 +78,7 @@ def split_store_retrieve(transcript):
         collection_name='video-transcripts'
     )
     # 'retriever' is a Runnable now
-    retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'k':4})
+    retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'k':8})
     return retriever
 
 
@@ -113,7 +113,15 @@ def translate(answer: str, mode: str) -> str:
             """)
         chain = translate_prompt | llm | parser
         return chain.invoke({"text": answer})
-
+    if mode == 'Translate to Roman Urdu':
+        translate_prompt = ChatPromptTemplate.from_template(
+            """
+            Translate the following text into clear Roman Urdu, 
+            keeping the meaning unchanged. Return only the translated text.
+            Text: {text} 
+            """)
+        chain = translate_prompt | llm | parser
+        return chain.invoke({"text": answer})
 
 # --------------------------   RETRIEVAL AUGMENTED GENERATION   ----------------------------
 
@@ -122,6 +130,13 @@ def translate(answer: str, mode: str) -> str:
 rag_query_rewrite_prompt = ChatPromptTemplate.from_template(
     """
     Reformulate the user question into a standalone query for the video transcript.
+    - If the question already makes sense on its own, return it unchanged.
+    - Do not try to correct typos unless they are obvious (e.g., "waht" → "what").
+    - If the question uses pronouns (it, he, she, they, etc.), resolve them to the
+      entity discussed in the last assistant answer, not earlier ones.
+    - Use older conversation history only if the last answer mentions pronouns.
+    - Do not replace words or change entities unless resolving a pronoun.
+
     Use conversation history for context.
     Conversation so far:
     {history}
@@ -180,8 +195,12 @@ RAG_chain = parallel_chain | RAG_prompt | llm | parser
 # Mini prompt to expand query into a standalone web search query
 query_rewrite_prompt = ChatPromptTemplate.from_template(
     """
-    Reformulate the user question into a standalone web search query.
-    Use conversation history for context if needed.
+    Reformulate the user question into a standalone query for the video transcript.
+    - If the question uses pronouns (it, he, she, they, etc.), resolve them to the
+      entity discussed in the last assistant answer, not earlier ones.
+    - Use older conversation history only if the last answer mentions pronouns.
+    - Do not replace words or change entities unless resolving a pronoun.
+
     Conversation so far:
     {history}
     Question: {question}
@@ -191,7 +210,7 @@ query_rewrite_prompt = ChatPromptTemplate.from_template(
 
 
 search_tool = TavilySearch(
-    max_results=5,
+    max_results=10,
     topic='general',
     tavily_api_key = os.getenv('TAVILY_API_KEY')
 )
@@ -209,7 +228,7 @@ tavily_prompt = PromptTemplate(
 
 
 def format_results(response: dict) -> str:
-  results = response.get('result',[])
+  results = response.get('results',[])
 
   joined_content = ""
   for r in results:
@@ -247,11 +266,13 @@ def route(yt_link: str, question: str, language: str) -> str:
     rag_answer = RAG_chain.invoke({'yt_link':yt_link, 'question':question, 'language':language})
     if "i don't know" in rag_answer.lower():
         tavily_answer = tavily_chain.invoke({'yt_link': yt_link, 'question': question})
-        final_answer = f"**Answering from the web**\n\n{tavily_answer}"
+        source = '**Answering from the web**\n\n'
+        final_answer = tavily_answer
     else:
-        final_answer = f"**Answering from the video**\n\n{rag_answer}"
+        source = '**Answering from the video**\n\n'
+        final_answer = rag_answer
 
-    final_answer = translate(answer=final_answer, mode=language)
+    final_answer = source + translate(answer=final_answer, mode=language)
     
     # UPDATE MEMORY with this turn
     memory.save_context({"input": question}, {"output": final_answer})

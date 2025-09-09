@@ -8,7 +8,7 @@ st.title('YouTube Assistant')
 with st.sidebar:
     language = st.radio('The bot can handle videos in English and Hindi.'
     'For videos in Hindi, please select language preference for the answer',
-    ['Answer in original language', 'Translate to English'],
+    ['Answer in original language', 'Translate to Roman Urdu', 'Translate to English'],
     index=0)
 
 
