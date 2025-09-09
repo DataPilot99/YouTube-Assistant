@@ -38,7 +38,7 @@ if prompt:
         st.session_state.messages.append({'role':'user', 'content':prompt}) # Adding message to memory
 
         try:
-            response = requests.post(url='http://backend:1111/chat', json={'url':link, 'question':prompt,
+            response = requests.post(url='http://backend:8080/chat', json={'url':link, 'question':prompt,
                                                                              'language':language })
             data = response.json()
             answer = data.get("answer", "No answer returned.")
