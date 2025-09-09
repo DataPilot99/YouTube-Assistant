@@ -11,6 +11,64 @@ The chatbot can answer any question given a YouTube video link. If the answer to
 * OpenAI LLM
 * Docker
 
+## Getting Started
+### Environment Setup
+First, create a virtual environment and activate it:
+
+```python -m venv venv
+source venv/bin/activate   # On Mac/Linux
+venv\Scripts\activate      # On Windows
+```
+Create a local environment file (.env) and add your API keys:
+```
+OPENAI_API_KEY=your_openai_api_key
+```
+### Install Dependencies
+Install dependencies separately for backend and frontend:
+
+Backend
+```
+cd backend
+pip install -r requirements.txt
+```
+
+Frontend
+```
+cd ../frontend
+pip install -r requirements.txt
+```
+
+### Run the Application
+Start the Backend (FastAPI)
+```
+cd backend
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+
+The API will be available at:
+http://localhost:8000/docs
+
+### Start the Frontend (Streamlit)
+
+In a separate terminal:
+```
+cd frontend
+streamlit run streamlit_app.py 
+```
+
+
+The frontend UI will be available at:
+http://localhost:8501
+
+### Usage
+
+Once both services are running:
+
+* Open the Streamlit frontend in your browser (http://localhost:8501).
+* Enter your query or text in the interface.
+* The frontend sends the request to the FastAPI backend, which processes it using pipeline.py.
+* Results are displayed instantly in the UI.
 
 ## File Explanations
 
