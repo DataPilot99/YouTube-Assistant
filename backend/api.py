@@ -22,6 +22,7 @@ app = FastAPI()
 class QuestionRequest(BaseModel):
     url: str
     question: str
+    language: str
 
 class AnswerResponse(BaseModel):
     answer: str
@@ -31,7 +32,7 @@ class AnswerResponse(BaseModel):
 @app.post('/chat', response_model=AnswerResponse)
 def answer(req: QuestionRequest):
     try:
-        answer = route(req.url, req.question )
+        answer = route(req.url, req.question, req.language )
         return {'answer': answer}
     except ValueError as e:
         return JSONResponse(status_code=422, content={"answer": f"{str(e)}"})

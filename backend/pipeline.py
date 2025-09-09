@@ -32,9 +32,8 @@ video_memories = defaultdict(
 
 
 
-#--------------------------------  RETRIEVAL AUGMENTED GENERATION  -----------------------------------------
+#------------------------------------  HELPER FUNCTIONS  -----------------------------------------
 
-# ------HELPER FUNCTIONS--------
 
 
 def get_memory_summary(yt_link: str) -> str:
@@ -58,7 +57,7 @@ def fetch_transcript(video_id):
     try:
         # fetches captions with timestamps
         yt_api = YouTubeTranscriptApi()
-        transcript_list = yt_api.fetch(video_id, languages=['en', 'hi'])
+        transcript_list = yt_api.fetch(video_id, languages=['hi', 'en'])
         # Join the text piece of every timestamp
         return " ".join(chunk.text for chunk in transcript_list)
     except TranscriptsDisabled:
@@ -102,14 +101,22 @@ def context(inputs: dict):
     return join_the_retrieved_docs(retrieved_docs)
 
 
-# -----RETRIEVE AND AUGMENT-------
+def translate(answer: str, mode: str) -> str:
+    if mode == "Answer in original language":
+        return answer
+    if mode == 'Translate to English':
+        translate_prompt = ChatPromptTemplate.from_template(
+            """
+            Translate the following text into clear English, 
+            keeping the meaning unchanged. Return only the translated text.
+            Text: {text} 
+            """)
+        chain = translate_prompt | llm | parser
+        return chain.invoke({"text": answer})
 
 
-# Obtain history and question for passing to prompt
-rag_query_inputs = RunnableParallel({
-    "history": RunnableLambda(lambda x: get_memory_summary(x["yt_link"])),
-    "question": RunnablePassthrough()
-})
+# --------------------------   RETRIEVAL AUGMENTED GENERATION   ----------------------------
+
 
 # Prompt to create standalone question from history and question
 rag_query_rewrite_prompt = ChatPromptTemplate.from_template(
@@ -122,15 +129,6 @@ rag_query_rewrite_prompt = ChatPromptTemplate.from_template(
     Return only the reformulated query.
     """
 )
-
-# Formulate a standalone question and retrieve context according to that
-rag_context_chain = RunnableParallel({
-                    "yt_link": RunnableLambda(lambda x: x["yt_link"]),
-                    "question": (rag_query_inputs | rag_query_rewrite_prompt | llm | parser)
-                    }) | RunnableLambda(context)
-
-
-
 
 # PromptTemplate provides a structure to the prompt thats sent to the llm
 RAG_prompt = PromptTemplate(
@@ -152,6 +150,20 @@ RAG_prompt = PromptTemplate(
 )
 
 
+# Obtain history and question for passing to prompt
+rag_query_inputs = RunnableParallel({
+    "history": RunnableLambda(lambda x: get_memory_summary(x["yt_link"])),
+    "question": RunnablePassthrough()
+})
+
+
+# Formulate a standalone question and retrieve context according to that
+rag_context_chain = RunnableParallel({
+                    "yt_link": RunnableLambda(lambda x: x["yt_link"]),
+                    "question": (rag_query_inputs | rag_query_rewrite_prompt | llm | parser)
+                    }) | RunnableLambda(context)
+
+
 # parallel_chain prepares the structured output, produces {context, question}
 parallel_chain = RunnableParallel({
     "history": RunnableLambda(lambda x: get_memory_summary(x["yt_link"])),
@@ -161,8 +173,6 @@ parallel_chain = RunnableParallel({
 
 
 RAG_chain = parallel_chain | RAG_prompt | llm | parser
-
-
 
 
 # ------------------------------------  WEB SEARCH FROM TAVILY   ---------------------------------------
@@ -230,17 +240,20 @@ tavily_chain = tavily_parallel_chain | tavily_prompt | llm | parser
 
 # --------------------------------   ROUTE TO RAG OR WEB  ---------------------------------------------
 
-def route(yt_link: str, question: str) -> str:
+def route(yt_link: str, question: str, language: str) -> str:
     video_id = extract_youtube_id(yt_link)
     memory = video_memories[video_id]
     
-    rag_answer = RAG_chain.invoke({'yt_link':yt_link, 'question':question})
+    rag_answer = RAG_chain.invoke({'yt_link':yt_link, 'question':question, 'language':language})
     if "i don't know" in rag_answer.lower():
         tavily_answer = tavily_chain.invoke({'yt_link': yt_link, 'question': question})
         final_answer = f"**Answering from the web**\n\n{tavily_answer}"
     else:
         final_answer = f"**Answering from the video**\n\n{rag_answer}"
+
+    final_answer = translate(answer=final_answer, mode=language)
     
     # UPDATE MEMORY with this turn
     memory.save_context({"input": question}, {"output": final_answer})
     return final_answer
+

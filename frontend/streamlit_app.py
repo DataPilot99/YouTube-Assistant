@@ -3,9 +3,14 @@ import requests
 import re
 
 st.title('YouTube Assistant')
-st.sidebar.write('**Instructions**\n\nPaste a YouTube video link, '
-'press enter, and ask a question in the chatbox.\n\n' \
-'The bot can handle videos in English and Hindi.\n\n')
+
+# Select language preference
+with st.sidebar:
+    language = st.radio('The bot can handle videos in English and Hindi.'
+    'For videos in Hindi, please select language preference for the answer',
+    ['Answer in original language', 'Translate to English'],
+    index=0)
+
 
 if 'messages' not in st.session_state:
     st.session_state.messages=[]
@@ -33,7 +38,8 @@ if prompt:
         st.session_state.messages.append({'role':'user', 'content':prompt}) # Adding message to memory
 
         try:
-            response = requests.post(url='http://127.0.0.1:1111/chat', json={'url':link, 'question':prompt})
+            response = requests.post(url='http://127.0.0.1:1111/chat', json={'url':link, 'question':prompt,
+                                                                             'language':language })
             data = response.json()
             answer = data.get("answer", "No answer returned.")
             
